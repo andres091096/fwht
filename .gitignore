@@ -1,0 +1,20 @@
+# generated folders
+obj_dir/
+.Xil/
+rtl/.Xil/
+
+#not_finished folders
+doc/
+img/
+
+
+# Binary files
+*.bin
+
+# Executables
+*.exe
+*.out
+*.vcd
+*.log
+*.jou
+*.str
