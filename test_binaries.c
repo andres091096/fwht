@@ -6,11 +6,11 @@
 
 int main(int argc, char *argv[]) {
 
-  int *Full_A   = (int*)calloc(4096,sizeof(int));
+  float *Full_A   = (float*)calloc(1229,sizeof(float));
   FILE *A_f;
-  A_f = fopen("Image_Recons_data.bin","rb");
-  fread(Full_A, 4096, sizeof(int), A_f);
+  A_f = fopen("data/ifwht_input.bin","rb");
+  fread(Full_A, 1229, sizeof(float), A_f);
   fclose(A_f);
-  printf("%i\n",Full_A[5] );
+  printf("%f\n",Full_A[55] );
   return 0;
 }

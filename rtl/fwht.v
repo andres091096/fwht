@@ -20,8 +20,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 `default_nettype	none
-module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tdata, m_axis_tvalid, m_axis_tready );
-    parameter WIDTH=512, L_WIDTH=12;
+module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tdata, m_axis_tvalid, m_axis_tready, o_index );
+    parameter WIDTH=32, L_WIDTH=12;
 
     input wire ACLK;
     input wire ARESET;
@@ -33,7 +33,7 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
     output wire [(WIDTH-1):0] m_axis_tdata;
     input wire m_axis_tready;
     output wire m_axis_tvalid;
-    //output wire [(L_WIDTH-1):0]o_index;
+    output wire [(L_WIDTH-1):0]o_index;
     /*
     wire [(WIDTH-1):0] out_stage13;
     wire [(WIDTH-1):0] out_stage12;
@@ -49,6 +49,7 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
     wire [(WIDTH-1):0] out_stage3;
     wire [(WIDTH-1):0] out_stage2;
     wire [(WIDTH-1):0] out_stage1;
+    wire [(WIDTH-1):0] d_tdada;
     /*
     wire valid_stage13;
     wire valid_stage12;
@@ -64,8 +65,9 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
     wire valid_stage3;
     wire valid_stage2;
     wire valid_stage1;
-    
+
     wire o_valid;
+    wire d_tvalid;
     /*
     stage #(.WIDTH(WIDTH), .L_WIDTH(L_WIDTH), .M_WIDTH(11))
             stage_13(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, out_stage13, valid_stage13);
@@ -73,8 +75,12 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
     stage #(.WIDTH(WIDTH), .L_WIDTH(L_WIDTH), .M_WIDTH(11))
             stage_12(ACLK, ARESET, out_stage13, valid_stage13, out_stage12, valid_stage12);
     */
+    assign d_tdada  = s_axis_tvalid ? s_axis_tdata : {WIDTH{1'b0}};
+    assign d_tvalid = s_axis_tvalid | (|count) ;
+
+
     stage #(.WIDTH(WIDTH), .L_WIDTH(L_WIDTH), .M_WIDTH(11))
-            stage_11(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, out_stage11, valid_stage11);
+            stage_11(ACLK, ARESET, d_tdada, d_tvalid, out_stage11, valid_stage11);
 
     stage #(.WIDTH(WIDTH), .L_WIDTH(L_WIDTH), .M_WIDTH(10))
             stage_10(ACLK, ARESET, out_stage11, valid_stage11, out_stage10, valid_stage10);
@@ -109,9 +115,9 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
     laststage #(.WIDTH(WIDTH))
               last(ACLK, ARESET, out_stage1, valid_stage1, m_axis_tdata, o_valid);
 
-    /*sequency_order #(.L_WIDTH(L_WIDTH), .MEASURES(3))
-                    seq_ord(ACLK, m_axis_tvalid, ARESET, o_index);*/
-    
+    sequency_order #(.L_WIDTH(L_WIDTH))
+                    seq_ord(ACLK, o_valid, ARESET, o_index);
+
     // s_axis_tready logic //
     localparam state1 = 2'b00;
     localparam state2 = 2'b01;
@@ -120,15 +126,15 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
 
     reg [1:0] state = state1;
     reg ready;
-    reg count_en;
+    reg count_rst;
     reg [(L_WIDTH-1):0] count = 0;
-   
+
     always @(posedge ACLK)
-        if (ARESET)
+        if (count_rst)
             count <= {L_WIDTH{1'b0}};
-        else if (count_en)
+        else
             count <= count + 1'b1;
-         
+
     always @(posedge ACLK)
         if (ARESET) begin
             state <= state1;
@@ -160,31 +166,31 @@ module fwht(ACLK, ARESET, s_axis_tdata, s_axis_tvalid, s_axis_tready, m_axis_tda
                   state <= state4;
             end
          endcase
-         
+
     always @(*)
         case (state)
             state1 : begin
                 ready    <= 1'b1;
-                count_en <= 1'b0;
+                count_rst <= 1'b1;
             end
             state2 : begin
                 ready    <= 1'b1;
-                count_en <= 1'b1;
+                count_rst <= 1'b0;
             end
             state3 : begin
                 ready    <= 1'b0;
-                count_en <= 1'b0;
+                count_rst <= 1'b1;
             end
-            state4 : begin  
+            state4 : begin
                 ready    <= 1'b0;
-                count_en <= 1'b0;
+                count_rst <= 1'b1;
             end
             default : begin
                 ready    <= 1'b1;
-                count_en <= 1'b0; 
+                count_rst <= 1'b1;
             end
         endcase
-    
+
     assign s_axis_tready = ready;
     assign m_axis_tvalid = o_valid;
 

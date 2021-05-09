@@ -101,7 +101,7 @@ float * fwht(float fwht_in[], int n)
   float x1; float x2;
   float *temp = (float*)calloc(n,sizeof(float)); //Walsh-Hadamard Transform
   int M; int L;
-  static float  fwht_out[4096];  //n=4096 because the use of static I must put a constant size
+  static float  fwht_out[INPUT_SIZE];  //n=4096 because the use of static I must put a constant size
   int stages = log10(n)/log10(2); // log2(n)
 
   M = n; L = n;
@@ -169,19 +169,20 @@ int main(int argc, char const *argv[]) {
   float f;
   int i = 0;
   fixed_point_t f_hardware;
-  fixed_point_t f_fp[INPUT_SIZE];
   float fwht_in[INPUT_SIZE];
-
-  std::ifstream fin("data/fwht_input.bin", std::ios::binary);
+  for (i = 0; i < INPUT_SIZE; i++) {
+    fwht_in[i] = 0;
+  }
+  i = 0;
+  std::ifstream fin("data/measures.bin", std::ios::binary);
   while (fin.read(reinterpret_cast<char*>(&f), sizeof(float))){
+    f = f/64;
     fwht_in[i] = f;
-    f_fp[i] = float_to_fixed(f);
     f_hardware = float_to_fixed(f);
     tick(++tickcount,tb,tfp);
-    tb->s_axis_tdata = f_hardware;
+    tb->s_axis_tdata  = f_hardware;
     tb->s_axis_tvalid = 1;
     i = i+1;
-
   }
   fin.close();
 
@@ -194,22 +195,27 @@ int main(int argc, char const *argv[]) {
   float tol_err = 1e-2;
   float diff;
   int j = 0;
+  int bits = log10(INPUT_SIZE)/log10(2); // log2(INPUT_SIZE)
+  int index_cpu;
+  int index_rtl;
+  float cpu_version[INPUT_SIZE];
   for (int i = 0; i < 8000; i++) {
     tick(++tickcount,tb,tfp);
     if (tb->m_axis_tvalid){
       diff = fixed_to_float((fixed_point_t)tb->m_axis_tdata) - *(fwht_out+j);
-      if (diff > tol_err){
+      index_cpu = bit_reversal(binaryToGray(j),bits);
+      index_rtl = tb->o_index;
+      cpu_version[j] = *(fwht_out+j);
+      if (abs(diff) > tol_err | index_cpu != index_rtl){
         check_status = 1;
+        printf("Data Mismatch: data : %i : Expected %f -> Got %f \n", j, *(fwht_out+j) , fixed_to_float((fixed_point_t)tb->m_axis_tdata));
       }
       j = j+1;
     }
   }
 
-
-
-  ofstream myFile ("data/Image_Recons_data.bin", ios::out | ios::binary);
-  myFile.write ((char*)&f_fp, INPUT_SIZE*sizeof(fixed_point_t));
-
+  /*ofstream myFile ("data/Image_Recons_data.bin", ios::out | ios::binary);
+  myFile.write ((char*)&f_fp, INPUT_SIZE*sizeof(fixed_point_t));*/
 
   if (check_status) {
       printf("INFO: Test failed\n");
